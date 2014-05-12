@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title></title>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <script src='lib/quintus.js'></script>
+        <script src='lib/quintus_sprites.js'></script>
+        <script src='lib/quintus_scenes.js'></script>
+    </head>
+    <body style="background-color: black;">
+        <div style="color:#fff;height:400px;width:300px;display:inline;float:left;" id="log">
+        </div>
+        <div style="display:inline;float:left;color:white;">
+            Options:<br/>
+            <ul>
+                <li>look</li>
+                <li>pickup (item)</li>
+                <li>drop (item)</li>
+                <li>display</li>
+                <li>go (room)</li>
+                <li>where</li>
+            </ul>
+        </div>
+        <br style="clear:both"/>
+        <input type="text" id="userCommand"/>
+        <button type="button" id="doButton">do!</button>
+        <script>
+        
+        var Q = Quintus().include("Sprites, Scenes").setup();
+        
+        function log(msg) {
+            var logElem = document.getElementById('log');
+            logElem.innerHTML += ('<div class="msg">'+msg+'<div/>');
+            if(logElem.children.length > 12) {
+                logElem.innerHTML = '';
+            }
+        }
+
+        // Rooms have descriptions and items. They should only have properties. No methods.
+        var rooms = {
+            basement: {
+                name: 'basement',
+                description: "This place smells.",
+                items: {'pipe': true, 'rope': true},
+                next: 'kitchen'
+            },
+            kitchen: {
+                name: 'kitchen',
+                description: 'This place is clean.',
+                items: {'plunger': true},
+                next: 'bathroom'
+            },
+            bathroom: {
+                name: 'bathroom',
+                description: 'This place is poopy.',
+                items: {'toilet paper': true},
+                next: 'kitchen'
+            }
+        };
+
+        // Create a new player and initialize location.
+        Q.Sprite.extend("Player", {
+            init: function(p) {
+                this._super(p, {
+                    location: 'basement'
+                });
+            },
+
+            look: function() {
+                var keys = [];
+                for(var k in rooms[this.p.location].items) keys.push(k);
+                log('You are in the '+rooms[this.p.location].name+'.');
+                log(rooms[this.p.location].description);
+                log('Items : '+keys);
+                log('Door to: '+rooms[this.p.location].next);
+            },
+
+            go: function(room) {
+                if(rooms[this.p.location].next == room) {
+                    this.p.location = room;
+                }
+                log('You are in the '+rooms[this.p.location].name);
+            },
+        
+            where: function() {
+                log('You are in the '+rooms[this.p.location].name+'.');
+            }
+
+        });
+
+        // A player has an inventory and interacts with the environment.
+        Q.component("inventory", { 
+            added: function() {
+                this.entity.p.inventory = {};
+            },
+
+            pickup: function(item) {
+                if(rooms[this.entity.p.location].items[item]) {
+                    this.entity.p.inventory[item] = true;
+                    delete rooms[this.entity.p.location].items[item];
+                    log('You picked up a '+item);
+                }
+            },
+
+            drop: function(item) {
+                log('You dropped the '+item);
+                rooms[this.entity.p.location].items[item] = true;
+                delete this.entity.p.inventory[item];
+            },
+
+            display: function() {
+                var keys = [];
+                for(var k in this.entity.p.inventory) keys.push(k);
+                log("Inventory items: "+keys);
+            }
+        });
+
+        Q.scene('startingScene', function(stage) {
+            var player = stage.insert(new Q.Player());
+            player.add("inventory");
+            player.inventory.display();
+            
+            // Handle user commands.
+            document.getElementById("doButton").addEventListener('click', function() {
+                var command = document.getElementById('userCommand').value;
+                if(command) {
+                    if(command.split(' ').length == 1) {
+                        if(typeof 'player.inventory.'+command == 'function') {
+                            eval('player.inventory.'+command+'();');
+                        } else {
+                            eval('player.'+command+'();');
+                        }
+                    } else {
+                        var commandArgs = command.split(' ');
+                        var command = commandArgs[0];
+
+                        var args = commandArgs.reverse();
+                        args.pop();
+                        args = args.reverse();
+                        args = ''+args;
+
+                        var newCommand;
+                        if(typeof 'player.inventory.'+command == 'function') {
+                            newCommand = 'player.inventory.'+command+'("'+args+'");';
+                        } else {
+                            newCommand = 'player.'+command+'("'+args+'");';
+                        }
+                        eval(newCommand);
+                    }
+                }
+            });
+        });
+
+        Q.load('', function() {
+            Q.stageScene('startingScene');
+        });
+        </script>
+    </body>
+</html>
